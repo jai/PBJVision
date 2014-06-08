@@ -406,6 +406,7 @@
     switch (gestureRecognizer.state) {
       case UIGestureRecognizerStateBegan:
         {
+            [self _updateCameraOrientation];
             if (!_recording)
                 [self _startCapture];
             else
@@ -446,6 +447,36 @@
 
     CGPoint adjustPoint = [PBJVisionUtilities convertToPointOfInterestFromViewCoordinates:tapPoint inFrame:_previewView.frame];
     [[PBJVision sharedInstance] focusExposeAndAdjustWhiteBalanceAtAdjustedPoint:adjustPoint];
+}
+
+#pragma mark - Orientation
+
+- (void)_updateCameraOrientation {
+    PBJCameraOrientation orientation = [[PBJVision sharedInstance] cameraOrientation];
+    UIDeviceOrientation deviceOrientation = [UIDevice currentDevice].orientation;
+    
+    switch (deviceOrientation) {
+        case UIDeviceOrientationPortrait:
+            orientation = PBJCameraOrientationPortrait;
+            break;
+            
+        case UIDeviceOrientationPortraitUpsideDown:
+            orientation = PBJCameraOrientationPortraitUpsideDown;
+            break;
+            
+        case UIDeviceOrientationLandscapeLeft:
+            orientation = PBJCameraOrientationLandscapeRight;
+            break;
+            
+        case UIDeviceOrientationLandscapeRight:
+            orientation = PBJCameraOrientationLandscapeLeft;
+            break;
+            
+        default:
+            break;
+    }
+    
+    [[PBJVision sharedInstance] setCurrentRecordingOrientation:orientation];
 }
 
 #pragma mark - PBJVisionDelegate

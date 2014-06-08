@@ -28,6 +28,7 @@
 
 #import <UIKit/UIDevice.h>
 #import <MobileCoreServices/UTCoreTypes.h>
+#import <Accelerate/Accelerate.h>
 
 #define LOG_WRITER 0
 #if !defined(NDEBUG) && LOG_WRITER
@@ -41,6 +42,7 @@
     AVAssetWriter *_assetWriter;
 	AVAssetWriterInput *_assetWriterAudioIn;
 	AVAssetWriterInput *_assetWriterVideoIn;
+    AVAssetWriterInputPixelBufferAdaptor *_videoAssetWriterAdaptor;
     
     NSURL *_outputURL;
     
@@ -217,6 +219,18 @@
 {
 	if ( _assetWriter.status == AVAssetWriterStatusUnknown ) {
     
+        if (mediaType == AVMediaTypeVideo) {
+            CMFormatDescriptionRef formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer);
+            CMVideoDimensions _currentVideoDimensions = CMVideoFormatDescriptionGetDimensions(formatDesc);
+            _videoAssetWriterAdaptor =  [AVAssetWriterInputPixelBufferAdaptor assetWriterInputPixelBufferAdaptorWithAssetWriterInput:_assetWriterVideoIn
+                                                                                                         sourcePixelBufferAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
+                                                                                                                                      [NSNumber numberWithInteger:kCVPixelFormatType_32BGRA], (id)kCVPixelBufferPixelFormatTypeKey,
+                                                                                                                                      [NSNumber numberWithUnsignedInteger:_currentVideoDimensions.width], (id)kCVPixelBufferWidthKey,
+                                                                                                                                      [NSNumber numberWithUnsignedInteger:_currentVideoDimensions.height], (id)kCVPixelBufferHeightKey,
+                                                                                                                                      (id)kCFBooleanTrue, (id)kCVPixelFormatOpenGLESCompatibility,
+                                                                                                                                      nil]];
+        }
+        
         if ([_assetWriter startWriting]) {
             CMTime startTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
 			[_assetWriter startSessionAtSourceTime:startTime];
@@ -237,11 +251,21 @@
         CMTime timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
 		if (mediaType == AVMediaTypeVideo) {
 			if (_assetWriterVideoIn.readyForMoreMediaData) {
-				if ([_assetWriterVideoIn appendSampleBuffer:sampleBuffer]) {
+
+                
+                CVPixelBufferRef videoPixelBuffer = [self correctBufferOrientation:sampleBuffer];
+                if ([_videoAssetWriterAdaptor appendPixelBuffer:videoPixelBuffer withPresentationTime:timestamp]) {
                     _videoTimestamp = timestamp;
-				} else {
-					DLog(@"writer error appending video (%@)", [_assetWriter error]);
+                } else {
+                    DLog(@"writer error appending video (%@)", [_assetWriter error]);
                 }
+                CVBufferRelease(videoPixelBuffer);
+
+//				if ([_assetWriterVideoIn appendSampleBuffer:sampleBuffer]) {
+//                    _videoTimestamp = timestamp;
+//				} else {
+//					DLog(@"writer error appending video (%@)", [_assetWriter error]);
+//                }
 			}
 		} else if (mediaType == AVMediaTypeAudio) {
 			if (_assetWriterAudioIn.readyForMoreMediaData) {
@@ -269,6 +293,104 @@
     _audioReady = NO;
     _videoReady = NO;    
 }
+
+#pragma mark - orientation
+
+- (CVPixelBufferRef)correctBufferOrientation:(CMSampleBufferRef)sampleBuffer
+{
+    CVImageBufferRef imageBuffer        = CMSampleBufferGetImageBuffer(sampleBuffer);
+    CVPixelBufferLockBaseAddress(imageBuffer, 0);
+    
+    size_t bytesPerRow                  = CVPixelBufferGetBytesPerRow(imageBuffer);
+    size_t width                        = CVPixelBufferGetWidth(imageBuffer);
+    size_t height                       = CVPixelBufferGetHeight(imageBuffer);
+    size_t currSize                     = bytesPerRow * height * sizeof(unsigned char);
+//    size_t bytesPerRowOut               = 4 * height * sizeof(unsigned char);
+    size_t bytesPerRowOut = bytesPerRow;
+    
+    void *srcBuff                       = CVPixelBufferGetBaseAddress(imageBuffer);
+    
+    /* rotationConstant:
+     *  0 -- rotate 0 degrees (simply copy the data from src to dest)
+     *  1 -- rotate 90 degrees counterclockwise
+     *  2 -- rotate 180 degress
+     *  3 -- rotate 270 degrees counterclockwise
+     */
+    uint8_t rotationConstant            = 0;
+    switch (self.videoOrientation) {
+        case AVCaptureVideoOrientationPortrait:
+        {
+            rotationConstant = 0;
+        }
+            break;
+            
+        case AVCaptureVideoOrientationLandscapeLeft:
+        {
+            rotationConstant = 1;
+        }
+            break;
+            
+        case AVCaptureVideoOrientationPortraitUpsideDown:
+        {
+            rotationConstant = 2;
+        }
+            break;
+            
+        case AVCaptureVideoOrientationLandscapeRight:
+        {
+            rotationConstant = 3;
+        }
+            break;
+            
+        default:
+            break;
+    }
+    
+    unsigned char *dstBuff              = (unsigned char *)malloc(currSize);
+    
+    vImage_Buffer inbuff                = {srcBuff, height, width, bytesPerRow};
+    
+    size_t outWidth;
+    size_t outHeight;
+    
+    if (rotationConstant == 0 || rotationConstant == 2) {
+        outWidth = width;
+        outHeight = height;
+    } else {
+        outWidth = height;
+        outHeight = width;
+    }
+    
+    vImage_Buffer outbuff = {dstBuff, outHeight, outWidth, bytesPerRowOut};
+    
+    uint8_t bgColor[4]                  = {0, 0, 0, 0};
+    
+    vImage_Error err                    = vImageRotate90_ARGB8888(&inbuff, &outbuff, rotationConstant, bgColor, 0);
+    if (err != kvImageNoError) NSLog(@"%ld", err);
+    
+    CVPixelBufferUnlockBaseAddress(imageBuffer, 0);
+    
+    CVPixelBufferRef rotatedBuffer      = NULL;
+    CVPixelBufferCreateWithBytes(NULL,
+                                 height,
+                                 width,
+                                 kCVPixelFormatType_32BGRA,
+                                 outbuff.data,
+                                 bytesPerRowOut,
+                                 freePixelBufferDataAfterRelease,
+                                 NULL,
+                                 NULL,
+                                 &rotatedBuffer);
+    
+    return rotatedBuffer;
+}
+
+void freePixelBufferDataAfterRelease(void *releaseRefCon, const void *baseAddress)
+{
+    // Free the memory we malloced for the vImage rotation
+    free((void *)baseAddress);
+}
+
 
 
 @end

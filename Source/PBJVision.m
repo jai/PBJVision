@@ -30,6 +30,7 @@
 
 #import <ImageIO/ImageIO.h>
 #import <OpenGLES/EAGL.h>
+#import <Accelerate/Accelerate.h>
 
 #define LOG_VISION 0
 #ifndef DLog
@@ -263,6 +264,17 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
     
     if ([_previewLayer.connection isVideoOrientationSupported])
         [self _setOrientationForConnection:_previewLayer.connection];
+}
+
+- (void)setCurrentRecordingOrientation:(PBJCameraOrientation)currentRecordingOrientation {
+    if (_currentRecordingOrientation == currentRecordingOrientation) {
+        return;
+    }
+    
+    _currentRecordingOrientation = currentRecordingOrientation;
+    if ([_mediaWriter respondsToSelector:@selector(setVideoOrientation:)]) {
+        [_mediaWriter setVideoOrientation:(AVCaptureVideoOrientation)_currentRecordingOrientation];
+    }
 }
 
 - (void)_setOrientationForConnection:(AVCaptureConnection *)connection
@@ -1557,6 +1569,7 @@ typedef void (^PBJVisionBlock)();
             _mediaWriter.delegate = nil;
         
         _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:outputURL];
+        _mediaWriter.videoOrientation = self.currentRecordingOrientation;
         _mediaWriter.delegate = self;
 
         AVCaptureConnection *videoConnection = [_captureOutputVideo connectionWithMediaType:AVMediaTypeVideo];

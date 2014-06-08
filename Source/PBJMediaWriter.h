@@ -52,6 +52,10 @@
 - (void)writeSampleBuffer:(CMSampleBufferRef)sampleBuffer ofType:(NSString *)mediaType;
 - (void)finishWritingWithCompletionHandler:(void (^)(void))handler;
 
+// orientation
+@property (nonatomic) AVCaptureVideoOrientation videoOrientation;
+
+
 @end
 
 @protocol PBJMediaWriterDelegate <NSObject>

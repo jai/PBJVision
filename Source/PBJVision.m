@@ -1020,14 +1020,16 @@ typedef void (^PBJVisionBlock)();
             [_captureOutputVideo setVideoSettings:videoSettings];
         
         // setup video device configuration
-        if (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1) {
+        if ([[[UIDevice currentDevice] systemVersion] floatValue] >= 7.0f) {
 
             NSError *error = nil;
             if ([newCaptureDevice lockForConfiguration:&error]) {
             
                 // smooth autofocus for videos
-                if ([newCaptureDevice isSmoothAutoFocusSupported])
-                    [newCaptureDevice setSmoothAutoFocusEnabled:YES];
+                if ([newCaptureDevice respondsToSelector:@selector(isSmoothAutoFocusSupported)]) {
+                    if ([newCaptureDevice isSmoothAutoFocusSupported])
+                        [newCaptureDevice setSmoothAutoFocusEnabled:YES];
+                }
                 
                 [newCaptureDevice unlockForConfiguration];
         

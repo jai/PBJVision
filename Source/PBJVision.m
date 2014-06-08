@@ -185,6 +185,7 @@ typedef NS_ENUM(GLint, PBJVisionUniformLocationTypes)
 @synthesize videoBitRate = _videoBitRate;
 @synthesize additionalCompressionProperties = _additionalCompressionProperties;
 @synthesize maximumCaptureDuration = _maximumCaptureDuration;
+@synthesize currentRecordingOrientation = _currentRecordingOrientation;
 
 #pragma mark - singleton
 
@@ -1569,7 +1570,7 @@ typedef void (^PBJVisionBlock)();
             _mediaWriter.delegate = nil;
         
         _mediaWriter = [[PBJMediaWriter alloc] initWithOutputURL:outputURL];
-        _mediaWriter.videoOrientation = self.currentRecordingOrientation;
+        _mediaWriter.videoOrientation = (AVCaptureVideoOrientation)self.currentRecordingOrientation;
         _mediaWriter.delegate = self;
 
         AVCaptureConnection *videoConnection = [_captureOutputVideo connectionWithMediaType:AVMediaTypeVideo];

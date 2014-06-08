@@ -53,6 +53,8 @@
     BOOL _videoReady;
 }
 
+void freePixelBufferDataAfterRelease(void *releaseRefCon, const void *baseAddress);
+
 @end
 
 @implementation PBJMediaWriter
@@ -62,6 +64,8 @@
 
 @synthesize audioTimestamp = _audioTimestamp;
 @synthesize videoTimestamp = _videoTimestamp;
+
+@synthesize videoOrientation = _videoOrientation;
 
 #pragma mark - getters/setters
 
@@ -225,8 +229,8 @@
             _videoAssetWriterAdaptor =  [AVAssetWriterInputPixelBufferAdaptor assetWriterInputPixelBufferAdaptorWithAssetWriterInput:_assetWriterVideoIn
                                                                                                          sourcePixelBufferAttributes:[NSDictionary dictionaryWithObjectsAndKeys:
                                                                                                                                       [NSNumber numberWithInteger:kCVPixelFormatType_32BGRA], (id)kCVPixelBufferPixelFormatTypeKey,
-                                                                                                                                      [NSNumber numberWithUnsignedInteger:_currentVideoDimensions.width], (id)kCVPixelBufferWidthKey,
-                                                                                                                                      [NSNumber numberWithUnsignedInteger:_currentVideoDimensions.height], (id)kCVPixelBufferHeightKey,
+                                                                                                                                      [NSNumber numberWithUnsignedInteger:(NSUInteger)_currentVideoDimensions.width], (id)kCVPixelBufferWidthKey,
+                                                                                                                                      [NSNumber numberWithUnsignedInteger:(NSUInteger)_currentVideoDimensions.height], (id)kCVPixelBufferHeightKey,
                                                                                                                                       (id)kCFBooleanTrue, (id)kCVPixelFormatOpenGLESCompatibility,
                                                                                                                                       nil]];
         }

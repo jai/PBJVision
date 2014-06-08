@@ -182,7 +182,7 @@
     _longPressGestureRecognizer.allowableMovement = 10.0f;
     
     // tap to focus
-    _tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_handleFocusTapGesterRecognizer:)];
+    _tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_handleFocusTapGestureRecognizer:)];
     _tapGestureRecognizer.delegate = self;
     _tapGestureRecognizer.numberOfTapsRequired = 1;
     _tapGestureRecognizer.enabled = NO;
@@ -424,7 +424,7 @@
     }
 }
 
-- (void)_handleFocusTapGesterRecognizer:(UIGestureRecognizer *)gestureRecognizer
+- (void)_handleFocusTapGestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
 {
     CGPoint tapPoint = [gestureRecognizer locationInView:_previewView];
 
